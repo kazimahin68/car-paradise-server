@@ -2,6 +2,7 @@ const express = require("express");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -66,6 +67,24 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await userCollection.findOne(query);
+      res.send(result);
+    });
+
+    app.patch("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const userUpdate = req.body;
+      const result = await userCollection.updateOne(
+        { _id:  new ObjectId(id)},
+        { $set: userUpdate },
+        {upsert: true}
+      );
+      res.send(result);
+    });
+
     // Cars API
 
     app.get("/cars", async (req, res) => {
@@ -73,24 +92,24 @@ async function run() {
       const result = await carsData.toArray();
       res.send(result);
     });
-    app.get("/cars/:id", verifyJWT, async (req, res) => {
+    app.get("/cars/:id", async (req, res) => {
       const id = req.params.id;
       const result = await carCollection.findOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 
-    app.post("/cars", verifyJWT, async (req, res) => {
+    app.post("/cars", async (req, res) => {
       const addCar = req.body;
       const result = await carCollection.insertOne(addCar);
       res.send(result);
     });
 
-    app.delete("/cars/:id", verifyJWT, async (req, res) => {
+    app.delete("/cars/:id", async (req, res) => {
       const id = req.params.id;
       const result = await carCollection.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
     });
-    app.patch("/cars/:id", verifyJWT, async (req, res) => {
+    app.patch("/cars/:id", async (req, res) => {
       const id = req.params.id;
       const updateData = req.body;
       const result = carCollection.updateOne(
