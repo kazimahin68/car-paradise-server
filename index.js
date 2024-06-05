@@ -125,6 +125,11 @@ async function run() {
 }
 run().catch(console.log);
 
+
+app.get("/", (req, res) => {
+    res.send("Car Paradise Server is Running")
+})
+
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
