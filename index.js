@@ -80,15 +80,12 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/users/:id", async (req, res) => {
-      const id = req.params.id;
-      const userUpdate = req.body;
-      const result = await userCollection.updateOne(
-        { _id:  new ObjectId(id)},
-        { $set: userUpdate },
-        {upsert: true}
-      );
-      res.send(result);
+    app.patch("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const updateData = req.body;
+      const result = await userCollection.updateOne({email: email}, {$set: updateData}, {upsert: true})
+      res.send(result)
+
     });
 
     // Cars API
@@ -118,7 +115,7 @@ async function run() {
     app.patch("/cars/:id", async (req, res) => {
       const id = req.params.id;
       const updateData = req.body;
-      const result = carCollection.updateOne(
+      const result = await carCollection.updateOne(
         { _id: new ObjectId(id) },
         { $set: updateData }
       );
