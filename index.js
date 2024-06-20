@@ -18,7 +18,7 @@ const verifyJWT = (req, res, next) => {
       .send({ error: true, message: "unauthorized access" });
   }
   const token = authorization.split(" ")[1];
-  verifyJWT.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decode) => {
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decode) => {
     if (err) {
       return res
         .status(401)
@@ -45,6 +45,7 @@ async function run() {
     const carParadise = client.db("carParadise");
     const carCollection = carParadise.collection("carCollection");
     const userCollection = carParadise.collection("userCollection");
+    const cartItemCollection = carParadise.collection("cartItemCollection");
 
     // JWT
     app.post("/jwt", (req, res) => {
@@ -52,8 +53,24 @@ async function run() {
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
         expiresIn: "1hr",
       });
-      res.send(token);
+      res.send({ token });
     });
+
+    // Verify Merchant
+
+    const verifyMerchant = async (req, res, next) => {
+      const email = req.decoded.email;
+      console.log(email)
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      console.log(user)
+      if (user?.role !== "merchant") {
+        return res
+          .status(403)
+          .send({ error: true, message: "forbidden message" });
+      }
+      next();
+    };
 
     // User related API
     app.post("/users", async (req, res) => {
@@ -67,11 +84,10 @@ async function run() {
       res.send(result);
     });
 
-
-    app.get("/users", async(req, res) => {
-      const result = await carCollection.find().toArray();
-      res.send(result)
-    })
+    app.get("/users", async (req, res) => {
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
 
     app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
@@ -83,18 +99,47 @@ async function run() {
     app.patch("/users/:email", async (req, res) => {
       const email = req.params.email;
       const updateData = req.body;
-      const result = await userCollection.updateOne({email: email}, {$set: updateData}, {upsert: true})
-      res.send(result)
-
+      const result = await userCollection.updateOne(
+        { email: email },
+        { $set: updateData },
+        { upsert: true }
+      );
+      res.send(result);
     });
 
     // Cars API
 
     app.get("/cars", async (req, res) => {
+      // const email = req.query.email;
+      // const decodedEmail = req.decoded;
+      // if(email !== decodedEmail){
+      //   return res.status(403).send({error: true, message: "forbidden access"})
+      // }
       const carsData = carCollection.find();
       const result = await carsData.toArray();
       res.send(result);
     });
+
+    app.get("/cars/popular", async (req, res) => {
+      const result = await carCollection
+        .find({ status: "approved" })
+        .sort({ sold: -1 })
+        .limit(6)
+        .toArray();
+      res.send(result);
+    });
+
+
+    // Get user cars
+    app.get("/cars/user/:email", verifyJWT, async(req, res) =>{
+      const email = req.params.email;
+      const query = {merchant_email: email};
+      const result = await carCollection.find(query).toArray();
+      res.send(result)
+    })
+
+
+
     app.get("/cars/:id", async (req, res) => {
       const id = req.params.id;
       const result = await carCollection.findOne({ _id: new ObjectId(id) });
@@ -121,6 +166,27 @@ async function run() {
       );
       res.send(result);
     });
+
+
+    // Cart Items API
+
+    app.get("/carts", async(req, res) => {
+      const email = req.query.email;
+      if(!email){
+        res.send([])
+      }
+      const query = {buyer_email: email}
+      const result = await cartItemCollection.find(query).toArray()
+      res.send(result)
+    })
+
+
+    app.post("/cars/cartItem", verifyJWT, async(req, res) =>{
+      const cartItems = req.body;
+      const result = await cartItemCollection.insertOne(cartItems);
+      res.send(result)
+    })
+
     console.log("Server is Connected");
   } finally {
     // await client.close();
@@ -128,10 +194,9 @@ async function run() {
 }
 run().catch(console.log);
 
-
 app.get("/", (req, res) => {
-    res.send("Car Paradise Server is Running")
-})
+  res.send("Car Paradise Server is Running");
+});
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
