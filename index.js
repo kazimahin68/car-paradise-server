@@ -3,6 +3,7 @@ require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const stripe = require("stripe")(`${process.env.PAYMENT_SECRET}`);
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -46,6 +47,7 @@ async function run() {
     const carCollection = carParadise.collection("carCollection");
     const userCollection = carParadise.collection("userCollection");
     const cartItemCollection = carParadise.collection("cartItemCollection");
+    const paymentCollection = carParadise.collection("paymentCollection");
 
     // JWT
     app.post("/jwt", (req, res) => {
@@ -60,10 +62,10 @@ async function run() {
 
     const verifyMerchant = async (req, res, next) => {
       const email = req.decoded.email;
-      console.log(email)
+      console.log(email);
       const query = { email: email };
       const user = await userCollection.findOne(query);
-      console.log(user)
+      console.log(user);
       if (user?.role !== "merchant") {
         return res
           .status(403)
@@ -130,14 +132,13 @@ async function run() {
       res.send(result);
     });
 
-
     // Get user cars(private)
-    app.get("/cars/user/:email", verifyJWT, async(req, res) =>{
+    app.get("/cars/user/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
-      const query = {merchant_email: email};
+      const query = { merchant_email: email };
       const result = await carCollection.find(query).toArray();
-      res.send(result)
-    })
+      res.send(result);
+    });
 
     //Get car info for edit page(private)
     app.get("/cars/:id", verifyJWT, async (req, res) => {
@@ -171,32 +172,79 @@ async function run() {
       res.send(result);
     });
 
-
     // Cart Items API
 
-    app.get("/carts", verifyJWT, async(req, res) => {
+    app.get("/carts", verifyJWT, async (req, res) => {
       const email = req.query.email;
-      if(!email){
-        res.send([])
+      if (!email) {
+        res.send([]);
       }
-      const query = {buyer_email: email}
-      const result = await cartItemCollection.find(query).toArray()
-      res.send(result)
-    })
+      const query = { buyer_email: email };
+      const result = await cartItemCollection.find(query).toArray();
+      res.send(result);
+    });
 
-
-    app.post("/cars/cartItem", verifyJWT, async(req, res) =>{
+    app.post("/cars/cartItem", verifyJWT, async (req, res) => {
       const cartItems = req.body;
       const result = await cartItemCollection.insertOne(cartItems);
-      res.send(result)
-    })
+      res.send(result);
+    });
 
     //CartItem delete
-    app.delete("/cars/cartItem/:id", async(req, res) => {
+    app.delete("/cars/cartItem/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
-      const result = await cartItemCollection.deleteOne({_id: new ObjectId(id)})
-      res.send(result)
-    })
+      const result = await cartItemCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+      res.send(result);
+    });
+    app.get("/cars/cartItem/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const result = await cartItemCollection.findOne({
+        _id: new ObjectId(id),
+      });
+      res.send(result);
+    });
+
+    // Payment API
+    // Create payment intent
+    app.post("/create-payment-intent", verifyJWT, async (req, res) => {
+      const { price } = req.body;
+      const amount = price * 100;
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+
+      app.post("/payments", verifyJWT, async (req, res) => {
+        const payment = req.body;
+        const insertResult = await paymentCollection.insertOne(payment);
+        const id = payment.deleteId;
+        console.log(id)
+        // const query = { _id: new ObjectId(id) };
+        // console.log(query)
+        // const selectedClassId = payment.id;
+        // console.log(selectedClassId)
+        // const filter = { _id: new ObjectId(selectedClassId) };
+        // // console.log(query, filter);
+        // const update = {
+        //   $inc: {
+        //     seats: -1,
+        //     enrolled: 1,
+        //   },
+        // };
+        // const updateResult = await classCollection.updateOne(filter, update);
+        // const deleteResult = await selectedClassCollection.deleteOne(query);
+        res.send(insertResult);
+        // console.log(updateResult, deleteResult)
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
 
     console.log("Server is Connected");
   } finally {
