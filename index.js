@@ -56,7 +56,7 @@ async function run() {
       res.send({ token });
     });
 
-    // Verify Merchant
+    // Verify Merchant :: TODO
 
     const verifyMerchant = async (req, res, next) => {
       const email = req.decoded.email;
@@ -120,6 +120,7 @@ async function run() {
       res.send(result);
     });
 
+    //Public
     app.get("/cars/popular", async (req, res) => {
       const result = await carCollection
         .find({ status: "approved" })
@@ -130,7 +131,7 @@ async function run() {
     });
 
 
-    // Get user cars
+    // Get user cars(private)
     app.get("/cars/user/:email", verifyJWT, async(req, res) =>{
       const email = req.params.email;
       const query = {merchant_email: email};
@@ -138,25 +139,28 @@ async function run() {
       res.send(result)
     })
 
-
-
-    app.get("/cars/:id", async (req, res) => {
+    //Get car info for edit page(private)
+    app.get("/cars/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const result = await carCollection.findOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 
-    app.post("/cars", async (req, res) => {
+    //Add new car (Private)
+    app.post("/cars", verifyJWT, async (req, res) => {
       const addCar = req.body;
       const result = await carCollection.insertOne(addCar);
       res.send(result);
     });
 
-    app.delete("/cars/:id", async (req, res) => {
+    //Delete car data (private)
+    app.delete("/cars/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const result = await carCollection.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
     });
+
+    //Update car info (private)
     app.patch("/cars/:id", async (req, res) => {
       const id = req.params.id;
       const updateData = req.body;
@@ -170,7 +174,7 @@ async function run() {
 
     // Cart Items API
 
-    app.get("/carts", async(req, res) => {
+    app.get("/carts", verifyJWT, async(req, res) => {
       const email = req.query.email;
       if(!email){
         res.send([])
@@ -184,6 +188,13 @@ async function run() {
     app.post("/cars/cartItem", verifyJWT, async(req, res) =>{
       const cartItems = req.body;
       const result = await cartItemCollection.insertOne(cartItems);
+      res.send(result)
+    })
+
+    //CartItem delete
+    app.delete("/cars/cartItem/:id", async(req, res) => {
+      const id = req.params.id;
+      const result = await cartItemCollection.deleteOne({_id: new ObjectId(id)})
       res.send(result)
     })
 
